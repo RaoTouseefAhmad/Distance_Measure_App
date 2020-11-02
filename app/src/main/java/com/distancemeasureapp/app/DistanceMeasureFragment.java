@@ -83,13 +83,6 @@ public class DistanceMeasureFragment extends Fragment implements
     //Movement dedcutor variable
 
     // Start with some variables
-    private SensorManager sensorMan;
-    private Sensor accelerometer;
-
-    private float[] mGravity;
-    private float mAccel;
-    private float mAccelCurrent;
-    private float mAccelLast;
     private double totalDistanceCover=0.0;
     private boolean isMovementStart = false;
     private boolean isLocationChanged = false;
@@ -221,16 +214,10 @@ public class DistanceMeasureFragment extends Fragment implements
                 .addOnConnectionFailedListener(this)
                 .build();
 
-        if(checkLocationPermission()){
+        if (checkLocationPermission()) {
             mGoogleApiClient.connect();
         }
 
-        // In onCreate method
-        sensorMan = (SensorManager)activity.getSystemService(SENSOR_SERVICE);
-        accelerometer = sensorMan.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        mAccel = 0.00f;
-        mAccelCurrent = SensorManager.GRAVITY_EARTH;
-        mAccelLast = SensorManager.GRAVITY_EARTH;
     }
 
     @Override
