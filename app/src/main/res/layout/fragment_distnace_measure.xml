@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".DistanceMeasureFragment">
+
+   <LinearLayout
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:orientation="vertical"
+       android:gravity="center"
+       >
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+       <TextView
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:text="GPS Status : "
+           android:textStyle="bold"
+           />
+       <TextView
+           android:id="@+id/gps_Status"
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:text="Connecting..."/>
+
+
+       </LinearLayout>
+
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+           <TextView
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="Time Frame : "
+               android:textStyle="bold"
+               />
+           <TextView
+               android:id="@+id/time_frame"
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="1 Minute"/>
+
+
+       </LinearLayout>
+
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+           <TextView
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="Minimum Distance : "
+               android:textStyle="bold"
+               />
+           <TextView
+               android:id="@+id/minimum_distance"
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="500m"/>
+
+
+       </LinearLayout>
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+           <TextView
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="Lat and long : "
+               android:textStyle="bold"
+               />
+
+           <TextView
+               android:id="@+id/lat_lang_value"
+               android:layout_width="wrap_content"
+               android:layout_height="match_parent"
+               android:text="Getting values ..." />
+
+
+       </LinearLayout>
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+           <TextView
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="Time remaining : "
+               android:textStyle="bold"
+               />
+           <TextView
+               android:id="@+id/time_rem"
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="1 minute"/>
+
+
+       </LinearLayout>
+
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+           <TextView
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="Distance Cover : "
+               android:textStyle="bold"
+               />
+           <TextView
+               android:id="@+id/distance_value"
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="No Movement Yet"/>
+
+
+       </LinearLayout>
+
+
+
+
+
+   </LinearLayout>
+</FrameLayout>
