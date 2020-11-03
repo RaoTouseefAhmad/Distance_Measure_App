@@ -9,6 +9,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -60,9 +64,9 @@ public class DistanceMeasureFragment extends Fragment
 
     private OnFragmentInteractionListener mListener;
 
-    TextView gpsStatusTextView,timeFrame,minDistanceTextView,latLongValue,timeRemaining,distnaceCoverTextView;
+    TextView gpsStatusTextView,timeFrame,minDistanceTextView,latLongValue,timeRemaining,distnaceCoverTextView,motionDeductTextView;
     Activity activity;
-    Location mCurrentLocation,firstLocation;
+    Location mCurrentLocation,prevLocation;
     boolean isFirstTime = true;
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
 
@@ -78,6 +82,18 @@ public class DistanceMeasureFragment extends Fragment
     LocationManager locationManager;
     LocationListener locationListenerGPS;
 
+    //motion sensor variables
+    // Start with some variables
+    private SensorManager sensorMan;
+          private Sensor accelerometer;
+
+          private float[] mGravity;
+          private float mAccel;
+          private float mAccelCurrent;
+          private float mAccelLast;
+          SensorEventListener sensorEventListener;
+
+          private static final int MIN_ACCELERATION = 3;
 
     private BroadcastReceiver locationSwitchStateReceiver = new BroadcastReceiver() {
 
@@ -107,6 +123,8 @@ public class DistanceMeasureFragment extends Fragment
 
     public DistanceMeasureFragment() {
     }
+
+
 
 
 
@@ -193,6 +211,8 @@ public class DistanceMeasureFragment extends Fragment
         latLongValue = view.findViewById(R.id.lat_lang_value);
         timeRemaining = view.findViewById(R.id.time_rem);
         distnaceCoverTextView = view.findViewById(R.id.distance_value);
+        motionDeductTextView = view.findViewById(R.id.motion_deduct);
+
 
         minDistanceTextView.setText(minDistanceValue + " meters");
         timeFrame.setText(minTime + " sec");
@@ -201,6 +221,48 @@ public class DistanceMeasureFragment extends Fragment
 
             getLocation();
         }
+
+        // In onCreate method
+        sensorMan = (SensorManager)activity.getSystemService(SENSOR_SERVICE);
+        accelerometer = sensorMan.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mAccel = 0.00f;
+        mAccelCurrent = SensorManager.GRAVITY_EARTH;
+        mAccelLast = SensorManager.GRAVITY_EARTH;
+         sensorEventListener=   new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER){
+                    mGravity = event.values.clone();
+                    // Shake detection
+                    float x = mGravity[0];
+                    float y = mGravity[1];
+                    float z = mGravity[2];
+                    mAccelLast = mAccelCurrent;
+                    mAccelCurrent = (float) Math.sqrt(x*x + y*y + z*z);
+                    float delta = mAccelCurrent - mAccelLast;
+                    mAccel = mAccel * 0.9f + delta;
+                    // Make this higher or lower according to how much
+                    // motion you want to detect
+                    if(mAccel > MIN_ACCELERATION){
+                        // do something
+                        motionDeductTextView.setText("Motion Start");
+
+                        if(!isMovementStart) {
+                            startTimer();
+                            isMovementStart=true;
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+            }
+        };
+        sensorMan.registerListener(sensorEventListener , accelerometer, SensorManager.SENSOR_DELAY_UI);
+
+
 
 
     }
@@ -234,7 +296,7 @@ public class DistanceMeasureFragment extends Fragment
                 //here you can have your logic to set text to edittext
                 if((millisUntilFinished/1000)%5==0){
                     if(isLocationChanged) {
-                        double distanceCover = distance(firstLocation.getLatitude(), firstLocation.getLongitude(), mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+                        double distanceCover = distance(prevLocation.getLatitude(), prevLocation.getLongitude(), mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
                         totalDistanceCover = totalDistanceCover + distanceCover;
 
                         distnaceCoverTextView.setText(String.format("%.2f", totalDistanceCover));
@@ -299,14 +361,19 @@ public class DistanceMeasureFragment extends Fragment
     public void onResume() {
         super.onResume();
 
+        sensorMan.registerListener(sensorEventListener, accelerometer,
+                SensorManager.SENSOR_DELAY_UI);
 
-
+    }
+    @Override
+    public void onPause() {
+        super.onPause();
+        sensorMan.unregisterListener(sensorEventListener);
     }
 
 
     private boolean locationEnabled () {
         LocationManager lm = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
-//                getSystemService(Context.LOCATION_SERVICE);
         boolean gps_enabled = false;
         boolean network_enabled = false;
         try {
@@ -366,6 +433,7 @@ public class DistanceMeasureFragment extends Fragment
         return deg * (Math.PI / 180);
     }
 
+
     private double distance(double lat1, double lon1, double lat2, double lon2) {
         double theta = lon1 - lon2;
         double dist = Math.sin(deg2rad(lat1))
@@ -394,26 +462,18 @@ public class DistanceMeasureFragment extends Fragment
                 double longitude = location.getLongitude();
 
                 if(isFirstTime){
-                    mCurrentLocation = firstLocation = location;
+                    mCurrentLocation = prevLocation = location;
                     isFirstTime = false;
                     gpsStatusTextView.setText("Connected");
                     Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
-                    double distanceCover = GetDistanceFromLatLonInMeters(firstLocation.getLatitude(),firstLocation.getLongitude(),mCurrentLocation.getLatitude(),mCurrentLocation.getLongitude());
+                    double distanceCover = GetDistanceFromLatLonInMeters(prevLocation.getLatitude(),prevLocation.getLongitude(),mCurrentLocation.getLatitude(),mCurrentLocation.getLongitude());
 
                     distnaceCoverTextView.setText(distanceCover+"");
                 }else {
                     Log.d(TAG, "Firing onLocationChanged..............................................");
-                    //firstLocation = mCurrentLocation;
+                    prevLocation = mCurrentLocation;
                     mCurrentLocation = location;
-
-
-                    //  double speed = location.getSpeed();
                     isLocationChanged = true;
-                    if(!isMovementStart) {
-                        startTimer();
-                        isMovementStart=true;
-                    }
-
 
                     Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
 
@@ -458,8 +518,8 @@ public class DistanceMeasureFragment extends Fragment
             }
         }
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-                5000,
-                10, locationListenerGPS);
+                INTERVAL,
+                LOCATIONDISTANCE, locationListenerGPS);
 
 
     }

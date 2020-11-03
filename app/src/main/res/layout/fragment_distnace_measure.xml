@@ -136,6 +136,27 @@
 
        </LinearLayout>
 
+       <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal">
+
+
+           <TextView
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="Distance Cover : "
+               android:textStyle="bold"
+               />
+           <TextView
+               android:id="@+id/motion_deduct"
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:text="No Movement Yet"/>
+
+
+       </LinearLayout>
+
 
 
 
