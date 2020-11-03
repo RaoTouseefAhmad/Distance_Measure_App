@@ -9,13 +9,11 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -33,21 +31,14 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
+
+import java.util.Objects;
 
 import static android.content.Context.SENSOR_SERVICE;
 
 
-public class DistanceMeasureFragment extends Fragment implements
-        LocationListener,
-        GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener{
+public class DistanceMeasureFragment extends Fragment
+      {
 
     private static final String TAG = "Debugger";
     //two variables for values
@@ -71,10 +62,6 @@ public class DistanceMeasureFragment extends Fragment implements
 
     TextView gpsStatusTextView,timeFrame,minDistanceTextView,latLongValue,timeRemaining,distnaceCoverTextView;
     Activity activity;
-    LocationManager locationManager;
-    LocationListener locationListenerGPS;
-    LocationRequest mLocationRequest;
-    GoogleApiClient mGoogleApiClient;
     Location mCurrentLocation,firstLocation;
     boolean isFirstTime = true;
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
@@ -88,6 +75,8 @@ public class DistanceMeasureFragment extends Fragment implements
     private boolean isLocationChanged = false;
 
 
+    LocationManager locationManager;
+    LocationListener locationListenerGPS;
 
 
     private BroadcastReceiver locationSwitchStateReceiver = new BroadcastReceiver() {
@@ -107,6 +96,7 @@ public class DistanceMeasureFragment extends Fragment implements
                     gpsStatusTextView.setText("Connected");
 
                 } else {
+                    locationEnabled();
                     //location is disabled
                     gpsStatusTextView.setText("Disconnected ");
                     Log.d("gpsstautus","false");
@@ -152,6 +142,7 @@ public class DistanceMeasureFragment extends Fragment implements
         IntentFilter filter = new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION);
         filter.addAction(Intent.ACTION_PROVIDER_CHANGED);
         activity.registerReceiver(locationSwitchStateReceiver, filter);
+        locationEnabled();
     }
 
     public boolean checkLocationPermission() {
@@ -206,17 +197,11 @@ public class DistanceMeasureFragment extends Fragment implements
         minDistanceTextView.setText(minDistanceValue + " meters");
         timeFrame.setText(minTime + " sec");
 
-        createLocationRequest();
-
-        mGoogleApiClient = new GoogleApiClient.Builder(activity)
-                .addApi(LocationServices.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-
         if (checkLocationPermission()) {
-            mGoogleApiClient.connect();
+
+            getLocation();
         }
+
 
     }
 
@@ -233,72 +218,12 @@ public class DistanceMeasureFragment extends Fragment implements
         }
     }
 
-    protected void createLocationRequest() {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(INTERVAL);
-        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setSmallestDisplacement(LOCATIONDISTANCE);
-
-
-    }
-
     @Override
     public void onDetach() {
         super.onDetach();
         mListener = null;
     }
 
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        startLocationUpdates();
-        gpsStatusTextView.setText("Connected");
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        gpsStatusTextView.setText("Connection failed");
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-
-
-        if(isFirstTime){
-            mCurrentLocation = firstLocation = location;
-            isFirstTime = false;
-            Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
-            double distanceCover = GetDistanceFromLatLonInMeters(firstLocation.getLatitude(),firstLocation.getLongitude(),mCurrentLocation.getLatitude(),mCurrentLocation.getLongitude());
-
-            distnaceCoverTextView.setText(distanceCover+"");
-        }else {
-            Log.d(TAG, "Firing onLocationChanged..............................................");
-           //firstLocation = mCurrentLocation;
-            mCurrentLocation = location;
-
-
-          //  double speed = location.getSpeed();
-            isLocationChanged = true;
-            if(!isMovementStart) {
-                startTimer();
-                isMovementStart=true;
-            }
-
-
-            Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
-
-
-        }
-
-        latLongValue.setText(mCurrentLocation.getLatitude()+","+mCurrentLocation.getLongitude());
-
-
-    }
 
     private void startTimer() {
 
@@ -353,10 +278,12 @@ public class DistanceMeasureFragment extends Fragment implements
                             Manifest.permission.ACCESS_FINE_LOCATION)
                             == PackageManager.PERMISSION_GRANTED) {
 
-                        mGoogleApiClient.connect();
+                        getLocation();
+                     //   mGoogleApiClient.connect();
                     }
 
                 } else {
+                    checkLocationPermission();
 
                     // permission denied, boo! Disable the
                     // functionality that depends on this permission.
@@ -371,37 +298,11 @@ public class DistanceMeasureFragment extends Fragment implements
     @Override
     public void onResume() {
         super.onResume();
-        if (mGoogleApiClient.isConnected()) {
-            startLocationUpdates();
-            Log.d(TAG, "Location update resumed .....................");
-        }
+
 
 
     }
 
-    protected void startLocationUpdates() {
-        if(locationEnabled()) {
-            PendingResult<Status> pendingResult = LocationServices.FusedLocationApi.requestLocationUpdates(
-                    mGoogleApiClient, mLocationRequest,this);
-            Log.d(TAG, "Location update started ..............: ");
-        }else {
-
-        }
-    }
-    @Override
-    public void onPause() {
-        super.onPause();
-        stopLocationUpdates();
-
-    }
-
-    protected void stopLocationUpdates() {
-        if(mGoogleApiClient.isConnected()) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(
-                    mGoogleApiClient, (com.google.android.gms.location.LocationListener) this);
-            Log.d(TAG, "Location update stopped .......................");
-        }
-    }
 
     private boolean locationEnabled () {
         LocationManager lm = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
@@ -483,5 +384,85 @@ public class DistanceMeasureFragment extends Fragment implements
     private double rad2deg(double rad) {
         return (rad * 180.0 / Math.PI);
     }
+
+    private void getLocation() {
+
+        locationListenerGPS = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                double latitude = location.getLatitude();
+                double longitude = location.getLongitude();
+
+                if(isFirstTime){
+                    mCurrentLocation = firstLocation = location;
+                    isFirstTime = false;
+                    gpsStatusTextView.setText("Connected");
+                    Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
+                    double distanceCover = GetDistanceFromLatLonInMeters(firstLocation.getLatitude(),firstLocation.getLongitude(),mCurrentLocation.getLatitude(),mCurrentLocation.getLongitude());
+
+                    distnaceCoverTextView.setText(distanceCover+"");
+                }else {
+                    Log.d(TAG, "Firing onLocationChanged..............................................");
+                    //firstLocation = mCurrentLocation;
+                    mCurrentLocation = location;
+
+
+                    //  double speed = location.getSpeed();
+                    isLocationChanged = true;
+                    if(!isMovementStart) {
+                        startTimer();
+                        isMovementStart=true;
+                    }
+
+
+                    Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
+
+
+                }
+
+                latLongValue.setText(mCurrentLocation.getLatitude()+","+mCurrentLocation.getLongitude());
+
+
+
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+
+            }
+
+            @Override
+            public void onProviderEnabled(String provider) {
+
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+
+            }
+        };
+
+
+        locationManager = (LocationManager) getActivity().getSystemService(Context.LOCATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Objects.requireNonNull(getContext()).checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && getContext().checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    Activity#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for Activity#requestPermissions for more details.
+
+                return;
+            }
+        }
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                5000,
+                10, locationListenerGPS);
+
+
+    }
+
 
 }
