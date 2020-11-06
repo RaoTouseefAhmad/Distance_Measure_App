@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import android.os.CountDownTimer;
+import android.os.Handler;
 import android.util.FloatMath;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -48,15 +49,14 @@ public class DistanceMeasureFragment extends Fragment
     //two variables for values
     //time in seconds
     //distnace in meters
-    private int minTime=60,minDistanceValue=500;
+    private int minTime=5,minDistanceValue=500;
 
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
 
-    private static final long INTERVAL = 1000*5;
-    private static final long FASTEST_INTERVAL = 1000*5;
+    private static final long INTERVAL = 1000*2;
 
-    private static final long LOCATIONDISTANCE = 7;
+    private static final long LOCATIONDISTANCE = 2;
 
 
     private String mParam1;
@@ -64,36 +64,31 @@ public class DistanceMeasureFragment extends Fragment
 
     private OnFragmentInteractionListener mListener;
 
-    TextView gpsStatusTextView,timeFrame,minDistanceTextView,latLongValue,timeRemaining,distnaceCoverTextView,motionDeductTextView;
-    Activity activity;
-    Location mCurrentLocation,prevLocation;
-    boolean isFirstTime = true;
+    private TextView gpsStatusTextView,timeFrame,minDistanceTextView,latLongValue,timeRemaining,distnaceCoverTextView,motionDeductTextView;
+    private Activity activity;
+    private Location mCurrentLocation;
+    private boolean isFirstTime = true;
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
+    Runnable movementRun,stopRun;
 
 
-    //Movement dedcutor variable
+    private LocationManager locationManager;
+    private LocationListener locationListenerGPS;
 
+    private Handler handler;
+
+    private boolean checkMovement = false;
+
+
+          //motion sensor variables
     // Start with some variables
-    private double totalDistanceCover=0.0;
-    private boolean isMovementStart = false;
-    private boolean isLocationChanged = false;
-
-
-    LocationManager locationManager;
-    LocationListener locationListenerGPS;
-
-    //motion sensor variables
-    // Start with some variables
-    private SensorManager sensorMan;
+          private SensorManager sensorMan;
           private Sensor accelerometer;
 
           private float[] mGravity;
-          private float mAccel;
-          private float mAccelCurrent;
-          private float mAccelLast;
+          private double mAccel;
           SensorEventListener sensorEventListener;
-
-          private static final int MIN_ACCELERATION = 3;
+          private static final int MIN_ACCELERATION =3;
 
     private BroadcastReceiver locationSwitchStateReceiver = new BroadcastReceiver() {
 
@@ -226,8 +221,8 @@ public class DistanceMeasureFragment extends Fragment
         sensorMan = (SensorManager)activity.getSystemService(SENSOR_SERVICE);
         accelerometer = sensorMan.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mAccel = 0.00f;
-        mAccelCurrent = SensorManager.GRAVITY_EARTH;
-        mAccelLast = SensorManager.GRAVITY_EARTH;
+
+        //this is the sensor listener which deduct the user movement
          sensorEventListener=   new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
@@ -237,21 +232,68 @@ public class DistanceMeasureFragment extends Fragment
                     float x = mGravity[0];
                     float y = mGravity[1];
                     float z = mGravity[2];
-                    mAccelLast = mAccelCurrent;
-                    mAccelCurrent = (float) Math.sqrt(x*x + y*y + z*z);
-                    float delta = mAccelCurrent - mAccelLast;
-                    mAccel = mAccel * 0.9f + delta;
-                    // Make this higher or lower according to how much
-                    // motion you want to detect
-                    if(mAccel > MIN_ACCELERATION){
-                        // do something
-                        motionDeductTextView.setText("Motion Start");
 
-                        if(!isMovementStart) {
-                            startTimer();
-                            isMovementStart=true;
+                    mAccel = (x*x+y*y+z*z)/(9.8*9.8);
+                   // Log.d("debuggerrun", mAccel + "");
+
+                    //if user acceleration is greater than out set min accleration tha this condition will run
+                    if(mAccel>MIN_ACCELERATION){
+
+                        motionDeductTextView.setText("Moving Now");
+                        motionDeductTextView.setBackgroundColor(getResources().getColor(R.color.green));
+                        //remove all waiting callbacks
+                        if(!checkMovement) { handler = new Handler();
+                            if (stopRun != null && movementRun != null) {
+                                handler.removeCallbacks(stopRun);
+                                handler.removeCallbacks(movementRun);
+                            }
+
+                            //waiting for the user if they contnously moving over min acceleration in min time
+                            movementRun = new Runnable() {
+                                public void run() {
+                                    checkMovement = true;
+                                    Log.d("debuggerrun", "run");
+                                    if(mCurrentLocation!=null) {
+                                        Log.d("coordinated", mCurrentLocation.getLatitude() + "," + mCurrentLocation.getLongitude());
+                                    }
+                                    perFormLogic();
+                                }
+                            };
+
+                            handler.postDelayed(movementRun, minTime* 1000);
                         }
+
+
+                    }else if (mAccel<MIN_ACCELERATION){
+                        //waiting for the user if they continously stop over min acceleration in min time
+                        if(checkMovement) {
+                            if (movementRun != null && stopRun != null) {
+                                handler.removeCallbacks(movementRun);
+                                handler.removeCallbacks(stopRun);
+                            }
+
+                            motionDeductTextView.setText("NOW STOP");
+                            motionDeductTextView.setBackgroundColor(getResources().getColor(R.color.red));
+
+
+                            stopRun = new Runnable() {
+                                public void run() {
+                                    checkMovement = false;
+                                    Log.d("debuggerrun", "stop");
+                                    if(mCurrentLocation!=null) {
+                                        Log.d("coordinated", mCurrentLocation.getLatitude() + "," + mCurrentLocation.getLongitude());
+                                    }
+                                    perFormLogic();
+
+                                }
+                            };
+
+                            handler.postDelayed(stopRun, minTime*1000);
+                        }
+
                     }
+
+
                 }
             }
 
@@ -267,7 +309,13 @@ public class DistanceMeasureFragment extends Fragment
 
     }
 
-    @Override
+    //Your Empty fucntion to perform the logics on user stop and start moving
+          private void perFormLogic() {
+        //TODO: implement your logic here
+          }
+
+
+          @Override
     public void onAttach(@NonNull Activity activity) {
         super.onAttach(activity);
         this.activity = activity;
@@ -287,44 +335,13 @@ public class DistanceMeasureFragment extends Fragment
     }
 
 
-    private void startTimer() {
-
-        new CountDownTimer(minTime*1000, 1000) {
-
-            public void onTick(long millisUntilFinished) {
-                timeRemaining.setText(millisUntilFinished / 1000+" secs");
-                //here you can have your logic to set text to edittext
-                if((millisUntilFinished/1000)%5==0){
-                    if(isLocationChanged) {
-                        double distanceCover = distance(prevLocation.getLatitude(), prevLocation.getLongitude(), mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
-                        totalDistanceCover = totalDistanceCover + distanceCover;
-
-                        distnaceCoverTextView.setText(String.format("%.2f", totalDistanceCover));
-                        isLocationChanged = false;
-                    }
-
-                }
-            }
-
-            public void onFinish() {
-                timeRemaining.setText("Time Over!");
-                if(totalDistanceCover<minDistanceValue){
-                    Toast.makeText(activity, "You are failed to cover the distance", Toast.LENGTH_SHORT).show();
-                }else {
-                    Toast.makeText(activity, "You are successfully cover the distance", Toast.LENGTH_SHORT).show();
-
-                }
-            }
-
-        }.start();
-    }
-
 
     public interface OnFragmentInteractionListener {
 
         void onFragmentInteraction(Uri uri);
     }
 
+    //this overide funcion check if location permsision granted or not
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
@@ -356,7 +373,7 @@ public class DistanceMeasureFragment extends Fragment
 
         }
     }
-
+//on resume I am setting the listener for GPS
     @Override
     public void onResume() {
         super.onResume();
@@ -371,7 +388,7 @@ public class DistanceMeasureFragment extends Fragment
         sensorMan.unregisterListener(sensorEventListener);
     }
 
-
+//this function check which service is available for getting corrdiantes
     private boolean locationEnabled () {
         LocationManager lm = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
         boolean gps_enabled = false;
@@ -415,67 +432,27 @@ public class DistanceMeasureFragment extends Fragment
         return gps_enabled;
     }
 
-    public double GetDistanceFromLatLonInMeters(double lat1, double lon1, double lat2, double lon2)
-    {
-        final int R = 6371;
-        // Radius of the earth in km
-        double dLat = deg2rad(lat2 - lat1);
-        // deg2rad below
-        double dLon = deg2rad(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double d = R * c;
-        // Distance in meters
-        return d*1000;
-    }
-    private double deg2rad(double deg)
-    {
-        return deg * (Math.PI / 180);
-    }
 
-
-    private double distance(double lat1, double lon1, double lat2, double lon2) {
-        double theta = lon1 - lon2;
-        double dist = Math.sin(deg2rad(lat1))
-                * Math.sin(deg2rad(lat2))
-                + Math.cos(deg2rad(lat1))
-                * Math.cos(deg2rad(lat2))
-                * Math.cos(deg2rad(theta));
-        dist = Math.acos(dist);
-        dist = rad2deg(dist);
-        dist = dist * 60 * 1.1515;
-        return (dist*1000);
-    }
-
-
-
-    private double rad2deg(double rad) {
-        return (rad * 180.0 / Math.PI);
-    }
-
+   //This function getting the current user location and have a listener on location change so it will
+          //calcute the cordinates for the user
     private void getLocation() {
 
         locationListenerGPS = new LocationListener() {
             @Override
-            public void onLocationChanged(Location location) {
-                double latitude = location.getLatitude();
-                double longitude = location.getLongitude();
-
+            public void onLocationChanged(final Location location) {
                 if(isFirstTime){
-                    mCurrentLocation = prevLocation = location;
+                    mCurrentLocation  = location;
                     isFirstTime = false;
                     gpsStatusTextView.setText("Connected");
                     Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
-                    double distanceCover = GetDistanceFromLatLonInMeters(prevLocation.getLatitude(),prevLocation.getLongitude(),mCurrentLocation.getLatitude(),mCurrentLocation.getLongitude());
 
-                    distnaceCoverTextView.setText(distanceCover+"");
                 }else {
                     Log.d(TAG, "Firing onLocationChanged..............................................");
-                    prevLocation = mCurrentLocation;
                     mCurrentLocation = location;
-                    isLocationChanged = true;
+
 
                     Log.d(TAG,mCurrentLocation.getLatitude() + ","+mCurrentLocation.getLongitude());
+
 
 
                 }
